@@ -26,3 +26,43 @@ def test_echo():
 def test_echo_validation_error():
     response = client.post("/echo", json={})
     assert response.status_code == 422
+
+def test_hello_zidan():
+    response = client.get("/hello/Zidan")
+
+    assert response.status_code == 200
+    assert response.json() == {"message": "Hello, Zidan!"}
+
+
+def test_items_limit_too_high():
+    response = client.get("/items?limit=100")
+
+    assert response.status_code == 422
+
+
+def test_create_note_title_too_short():
+    response = client.post(
+        "/notes",
+        json={
+            "title": "ab",
+            "content": "Belajar FastAPI"
+        }
+    )
+
+    assert response.status_code == 422
+
+
+def test_create_note_valid():
+    response = client.post(
+        "/notes",
+        json={
+            "title": "Belajar FastAPI",
+            "content": "Mempelajari pytest"
+        }
+    )
+
+    assert response.status_code == 201
+    assert response.json() == {
+        "title": "Belajar FastAPI",
+        "content": "Mempelajari pytest"
+    }
