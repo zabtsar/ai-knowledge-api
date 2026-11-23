@@ -11,6 +11,13 @@ from sqlalchemy.orm import Session
 from app import models, schemas
 from app.database import get_db
 
+from app.security import hash_password, verify_password
+from app.auth import create_access_token
+
+from app.auth import get_current_user
+
+from app.auth import require_role
+
 from app.core.config import APP_ENV, APP_NAME, APP_VERSION
 
 app = FastAPI(
@@ -190,3 +197,115 @@ def delete_document(
     db.commit()
 
     return None
+
+@app.post(
+    "/auth/register",
+    response_model=schemas.UserResponse,
+    status_code=status.HTTP_201_CREATED
+)
+def register_user(
+    user: schemas.UserCreate,
+    db: Session = Depends(get_db)
+):
+    # Cek apakah username sudah digunakan
+    existing_username = db.query(models.User).filter(
+        models.User.username == user.username
+    ).first()
+
+    if existing_username:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Username already registered"
+        )
+
+    # Cek apakah email sudah digunakan
+    existing_email = db.query(models.User).filter(
+        models.User.email == user.email
+    ).first()
+
+    if existing_email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Email already registered"
+        )
+
+    # Hash password sebelum disimpan
+    hashed_password = hash_password(user.password)
+
+    new_user = models.User(
+        username=user.username,
+        email=user.email,
+        password_hash=hashed_password,
+        role="user"
+    )
+
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+
+    return new_user
+
+
+@app.post("/auth/login", response_model=schemas.Token)
+def login_user(
+    user: schemas.UserLogin,
+    db: Session = Depends(get_db)
+):
+    # Cari user berdasarkan username
+    db_user = db.query(models.User).filter(
+        models.User.username == user.username
+    ).first()
+
+    # Verifikasi username dan password
+    if not db_user or not verify_password(
+        user.password,
+        db_user.password_hash
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid username or password",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+    # Buat JWT
+    access_token = create_access_token(
+        data={
+            "sub": str(db_user.id),
+            "role": db_user.role
+        }
+    )
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer"
+    }
+
+@app.get("/auth/me", response_model=schemas.UserResponse)
+def read_current_user(
+    current_user: models.User = Depends(get_current_user)
+):
+    return current_user
+
+@app.get("/user/dashboard")
+def user_dashboard(
+    current_user: models.User = Depends(
+        require_role("user", "admin")
+    )
+):
+    return {
+        "message": "Welcome to User Dashboard",
+        "username": current_user.username,
+        "role": current_user.role
+    }
+
+@app.get("/admin/dashboard")
+def admin_dashboard(
+    current_user: models.User = Depends(
+        require_role("admin")
+    )
+):
+    return {
+        "message": "Welcome to Admin Dashboard",
+        "username": current_user.username,
+        "role": current_user.role
+    }

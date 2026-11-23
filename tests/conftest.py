@@ -1,4 +1,3 @@
-
 import pytest
 
 from sqlalchemy import create_engine
@@ -8,7 +7,6 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.database import Base, get_db
-from app import models
 
 # Database SQLite khusus testing
 SQLALCHEMY_DATABASE_URL = "sqlite://"
@@ -25,17 +23,24 @@ TestingSessionLocal = sessionmaker(
     bind=test_engine
 )
 
-# Membuat database baru untuk setiap test
+
 @pytest.fixture
-def client():
+def db():
     Base.metadata.create_all(bind=test_engine)
 
+    database = TestingSessionLocal()
+
+    try:
+        yield database
+    finally:
+        database.close()
+        Base.metadata.drop_all(bind=test_engine)
+
+
+@pytest.fixture
+def client(db):
     def override_get_db():
-        db = TestingSessionLocal()
-        try:
-            yield db
-        finally:
-            db.close()
+        yield db
 
     app.dependency_overrides[get_db] = override_get_db
 
@@ -43,4 +48,3 @@ def client():
         yield test_client
 
     app.dependency_overrides.clear()
-    Base.metadata.drop_all(bind=test_engine)
