@@ -67,3 +67,26 @@ def test_create_note_valid():
         "title": "Belajar FastAPI",
         "content": "Mempelajari pytest"
     }
+
+def test_cors_allowed_origin(client):
+    response = client.get(
+        "/health",
+        headers={
+            "Origin": "http://localhost:5173"
+        }
+    )
+
+    assert response.status_code == 200
+    assert response.headers["access-control-allow-origin"] == "http://localhost:5173"
+
+
+def test_cors_disallowed_origin(client):
+    response = client.get(
+        "/health",
+        headers={
+            "Origin": "http://malicious-site.com"
+        }
+    )
+
+    assert response.status_code == 200
+    assert "access-control-allow-origin" not in response.headers

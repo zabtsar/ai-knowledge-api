@@ -2,7 +2,7 @@ from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
 from pydantic import Field
-
+from pydantic import Field, EmailStr
 
 # Schema untuk membuat Document
 class DocumentCreate(BaseModel):
@@ -49,3 +49,19 @@ class UserResponse(BaseModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+
+class UserCreate(BaseModel):
+    username: str = Field(
+        ...,
+        min_length=3,
+        max_length=50,
+        pattern=r"^[a-zA-Z0-9_]+$"
+    )
+
+    email: EmailStr
+
+    password: str = Field(
+        ...,
+        min_length=8,
+        max_length=72
+    )

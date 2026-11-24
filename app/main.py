@@ -18,12 +18,42 @@ from app.auth import get_current_user
 
 from app.auth import require_role
 
+from fastapi import FastAPI, Request
+
+from fastapi.middleware.cors import CORSMiddleware
+
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
 from app.core.config import APP_ENV, APP_NAME, APP_VERSION
+
+limiter = Limiter(key_func=get_remote_address)
 
 app = FastAPI(
     title=APP_NAME,
     version=APP_VERSION,
     description="REST API for uploading documents and asking questions about them (RAG).",
+)
+
+app.state.limiter = limiter
+app.add_exception_handler(
+    RateLimitExceeded,
+    _rate_limit_exceeded_handler
+)
+
+origins = [
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 
@@ -203,10 +233,13 @@ def delete_document(
     response_model=schemas.UserResponse,
     status_code=status.HTTP_201_CREATED
 )
+@limiter.limit("10/minute")
 def register_user(
+    request: Request,
     user: schemas.UserCreate,
     db: Session = Depends(get_db)
 ):
+    # Pertahankan seluruh isi fungsi register milikmu
     # Cek apakah username sudah digunakan
     existing_username = db.query(models.User).filter(
         models.User.username == user.username
@@ -247,11 +280,13 @@ def register_user(
 
 
 @app.post("/auth/login", response_model=schemas.Token)
+@limiter.limit("10/minute")
 def login_user(
+    request: Request,
     user: schemas.UserLogin,
     db: Session = Depends(get_db)
 ):
-    # Cari user berdasarkan username
+    
     db_user = db.query(models.User).filter(
         models.User.username == user.username
     ).first()

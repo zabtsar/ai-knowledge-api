@@ -146,3 +146,41 @@ def test_dashboard_without_token(client):
     response = client.get("/admin/dashboard")
 
     assert response.status_code == 401
+
+def test_register_invalid_email(client):
+    response = client.post(
+        "/auth/register",
+        json={
+            "username": "testuser",
+            "email": "bukan-email",
+            "password": "password123"
+        }
+    )
+
+    assert response.status_code == 422
+
+
+def test_register_short_password(client):
+    response = client.post(
+        "/auth/register",
+        json={
+            "username": "testuser",
+            "email": "test@example.com",
+            "password": "123"
+        }
+    )
+
+    assert response.status_code == 422
+
+
+def test_register_invalid_username(client):
+    response = client.post(
+        "/auth/register",
+        json={
+            "username": "test user!",
+            "email": "test@example.com",
+            "password": "password123"
+        }
+    )
+
+    assert response.status_code == 422
